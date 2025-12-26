@@ -1,11 +1,34 @@
 import express from "express";
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { driverOnly } from "../middleware/driverOnly.js";
 
 const router = express.Router();
 
-router.get("/", verifyToken, async (req, res) => {
+router.post("/", protect, driverOnly, async (req, res) => {
+  const { pickup, destination, price } = req.body;
+
+  const ride = await Ride.create({
+    pickup,
+    destination,
+    price,
+    driverId: req.user.uid,
+  });
+
+  res.json(ride);
+});
+
+
+router.post("/:rideId/book", protect, async (req, res) => {
+  const booking = await Booking.create({
+    ride: req.params.rideId,
+    userEmail: req.user.email,
+  });
+  res.json(booking);
+});
+
+router.get("/",protect, async (req, res) => {
   const { driverId, userEmail } = req.query;
 
   let bookings = await Booking.find().populate("ride");
