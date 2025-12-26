@@ -50,34 +50,24 @@ router.get("/",protect, async (req, res) => {
 
 
 
-router.patch("/:id/approve", async (req, res) => {
-  console.log("APPROVE HIT", req.params.id);
-
-  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(400).json({ error: "Invalid booking ID" });
-  }
-
+router.patch("/:id/:action", protect, driverOnly, async (req, res) => {
   const booking = await Booking.findById(req.params.id);
 
-  if (!booking) {
-    return res.status(404).json({ error: "Booking not found" });
-  }
+  if (!booking) return res.status(404).json({ error: "Not found" });
 
-  booking.status = "approved";
+  booking.status =
+    req.params.action === "approve" ? "approved" : "rejected";
+
   await booking.save();
 
-  res.json({ success: true, booking });
+  // 🔥 Update Firestore
+  await admin.firestore()
+    .collection("bookings")
+    .doc(booking._id.toString())
+    .update({ status: booking.status });
+
+  res.json({ success: true });
 });
 
-
-router.patch("/:id/reject", async (req, res) => {
-  console.log("REJECT HIT", req.params.id);
-
-  const booking = await Booking.findById(req.params.id);
-  booking.status = "rejected";
-  await booking.save();
-
-  res.json(booking);
-});
 
 export default router;

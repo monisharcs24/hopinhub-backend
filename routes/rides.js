@@ -1,5 +1,8 @@
 import express from "express";
 import Ride from "../models/Ride.js";
+import admin from "../firebaseAdmin.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { driverOnly } from "../middleware/driverOnly.js";
 
 const router = express.Router();
 
@@ -9,17 +12,23 @@ console.log("✅ rides routes loaded");
 /**
  * Create a new ride
  */
-router.post("/", async (req, res) => {
-  const { pickup, destination, price, driverId } = req.body;
-
-  const ride = new Ride({
-    pickup,
-    destination,
-    price,
-    driverId,
+router.post("/", protect, driverOnly, async (req, res) => {
+  const ride = await Ride.create({
+    pickup: req.body.pickup,
+    destination: req.body.destination,
+    price: req.body.price,
+    driverId: req.user.uid,
   });
 
-  await ride.save();
+  // 🔥 Add to Firestore
+  await admin.firestore().collection("rides").doc(ride._id.toString()).set({
+    pickup: ride.pickup,
+    destination: ride.destination,
+    price: ride.price,
+    driverId: ride.driverId,
+    status: "available",
+  });
+
   res.json(ride);
 });
 
