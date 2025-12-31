@@ -2,10 +2,11 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Register
+/* ================= REGISTER ================= */
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -16,6 +17,7 @@ router.post("/register", async (req, res) => {
       name,
       email,
       password: hashedPassword,
+      role: "user", // default
     });
 
     res.status(201).json({ message: "User registered successfully" });
@@ -24,7 +26,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Login
+/* ================= LOGIN ================= */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -47,16 +49,10 @@ router.post("/login", async (req, res) => {
   }
 });
 
-export default router;
-
-// Firebase user sync (login with Firebase, store in MongoDB)
+/* ================= FIREBASE LOGIN ================= */
 router.post("/firebase-login", async (req, res) => {
   try {
     const { uid, name, email, photo } = req.body;
-
-    if (!uid || !email) {
-      return res.status(400).json({ error: "Invalid Firebase user data" });
-    }
 
     let user = await User.findOne({ email });
 
@@ -65,12 +61,37 @@ router.post("/firebase-login", async (req, res) => {
         name,
         email,
         photo,
-        password: null, // Firebase user
+        role: "user", // default role
       });
     }
 
-    res.json({ message: "Firebase user synced", user });
+    res.json({ user });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+/* ================= CHANGE ROLE ================= */
+router.patch("/role", protect, async (req, res) => {
+  const { role } = req.body;
+
+  if (!["user", "driver"].includes(role)) {
+    return res.status(400).json({ error: "Invalid role" });
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { role },
+    { new: true }
+  );
+
+  res.json(user);
+});
+
+/* ================= GET CURRENT USER ================= */
+router.get("/me", protect, async (req, res) => {
+  const user = await User.findById(req.user.id);
+  res.json(user);
+});
+
+export default router;
